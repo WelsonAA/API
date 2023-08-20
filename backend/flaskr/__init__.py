@@ -36,7 +36,7 @@ def create_app(test_config=None):
         cats = {}
         for category in categories:
             cats[category.id] = category.type
-    return jsonify({ "catecories": cats })
+        return jsonify({ "catecories": cats })
 
     """
     @TODO:
