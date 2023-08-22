@@ -1,11 +1,12 @@
 import os
-from flask import Flask, request, abort, jsonify
+import sys
+
+from flask import Flask, request, abort, jsonify, Response,json
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import random
 
-from models import setup_db, Question, Category
-
+from backend.tables import setup_db, Question, Category, db
 QUESTIONS_PER_PAGE = 10
 
 def create_app(test_config=None):
@@ -37,9 +38,10 @@ def create_app(test_config=None):
         if len(categories) == 0:
             abort(404)
 
-        return jsonify({'success': True, 'categories': {
+        res = jsonify({'categories': {
             category.id: category.type for category in categories
         }})
+        return res
 
     """
     @TODO:
@@ -53,7 +55,26 @@ def create_app(test_config=None):
     ten questions per page and pagination at the bottom of the screen for three pages.
     Clicking on the page numbers should update the questions.
     """
-
+    @app.route('/questions', methods=['GET'])
+    def get_questions():
+        page = request.args.get('page', 1, type=int)
+        start = (page-1)*QUESTIONS_PER_PAGE
+        end = start + QUESTIONS_PER_PAGE
+        questions = Question.query.order_by(Question.id).offset(start).limit(QUESTIONS_PER_PAGE).all()
+        questions_format = [question.format() for question in questions]
+        total_questions = Question.query.count()
+        current_category_id = questions[0].category
+        current_category_string = Category.query.get(current_category_id).type
+        categories = Category.query.order_by(Category.id).all()
+        categories_format = [category.format() for category in categories]
+        response_data = {
+            'questions': questions_format,
+            'totalQuestions': total_questions,
+            'categories': categories_format,
+            'currentCategory': current_category_string
+        }
+        response = Response(json.dumps(response_data, sort_keys=False), content_type='application/json')
+        return response
     """
     @TODO:
     Create an endpoint to DELETE question using a question ID.
@@ -61,6 +82,25 @@ def create_app(test_config=None):
     TEST: When you click the trash icon next to a question, the question will be removed.
     This removal will persist in the database and when you refresh the page.
     """
+    @app.route('/questions/<int:question_id>')
+    def delete_question(question_id):
+        error = False
+        try:
+            this_question = Question.query.get(question_id)
+            db.session.delete(this_question)
+            db.session.commit()
+        except:
+            error = True
+            db.session.rollback()
+            print(sys.exc_info())
+        finally:
+            db.session.close()
+        if error:
+            abort(500)
+        else:
+            return jsonify({
+                'deletedQuestion': question_id
+            })
 
     """
     @TODO:
@@ -92,7 +132,19 @@ def create_app(test_config=None):
     categories in the left column will cause only questions of that
     category to be shown.
     """
-
+    @app.route('/categories/<int:category_id>/questions')
+    def get_category_questions(category_id):
+        questions = Question.query.filter_by(category=category_id).all()
+        questions_format = [question.format() for question in questions]
+        total_questions = Question.query.count()
+        current_category_string = Category.query.get(category_id).type
+        response_data = {
+            'questions': questions_format,
+            'totalQuestions': total_questions,
+            'currentCategory': current_category_string
+        }
+        response = Response(json.dumps(response_data, sort_keys=False), content_type='application/json')
+        return response
     """
     @TODO:
     Create a POST endpoint to get questions to play the quiz.
@@ -112,3 +164,6 @@ def create_app(test_config=None):
     """
 
     return app
+
+
+create_app()
