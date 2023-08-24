@@ -38,15 +38,20 @@ def create_app(test_config=None):
 
     @app.route('/categories', methods=['GET'])
     def get_categories():
-        categories = Category.query.order_by(Category.type).all()
+        try:
+            categories = Category.query.order_by(Category.type).all()
 
-        if len(categories) == 0:
+            if len(categories) == 0:
+                raise NotFoundException
+
+            res = jsonify({'categories': {
+                category.id: category.type for category in categories
+            }})
+            return res
+        except NotFoundException:
             abort(404)
-
-        res = jsonify({'categories': {
-            category.id: category.type for category in categories
-        }})
-        return res
+        except:
+            abort(500)
 
     """
     @TODO:
@@ -86,6 +91,8 @@ def create_app(test_config=None):
             return response
         except NotFoundException:
             abort(404)
+        except:
+            abort(500)
 
     """
     @TODO:
@@ -119,22 +126,24 @@ def create_app(test_config=None):
                 'deletedQuestion': question_id
             })
 
+
     """
     @TODO:
-    Create an endpoint to POST a new question,
-    which will require the question and answer text,
-    category, and difficulty score.
+    Create a POST endpoint to get questions based on a search term.
+    It should return any questions for whom the search term
+    is a substring of the question.
 
-    TEST: When you submit a question on the "Add" tab,
-    the form will clear and the question will appear at the end of the last page
-    of the questions list in the "List" tab.
+    TEST: Search by any phrase. The questions list will update to include
+    only question that include that string within their question.
+    Try using the word "title" to start.
     """
-
     @app.route('/questions/search', methods=['POST'])
     def search_question():
         try:
             body = request.get_json()
             search_term = body.get('searchTerm', None)
+            if search_term is None:
+                raise MissingDataException
             fetched_questions = Question.query.filter(Question.question.like(f'%{search_term}%')).all()
             if len(fetched_questions) == 0:
                 raise NotFoundException()
@@ -151,18 +160,22 @@ def create_app(test_config=None):
             return response
         except NotFoundException:
             abort(404)
+        except MissingDataException:
+            abort(422)
+        except:
+            abort(500)
+
 
     """
     @TODO:
-    Create a POST endpoint to get questions based on a search term.
-    It should return any questions for whom the search term
-    is a substring of the question.
+    Create an endpoint to POST a new question,
+    which will require the question and answer text,
+    category, and difficulty score.
 
-    TEST: Search by any phrase. The questions list will update to include
-    only question that include that string within their question.
-    Try using the word "title" to start.
+    TEST: When you submit a question on the "Add" tab,
+    the form will clear and the question will appear at the end of the last page
+    of the questions list in the "List" tab.
     """
-
     @app.route('/questions', methods=['POST'])
     def create_question():
         error = False
@@ -228,6 +241,8 @@ def create_app(test_config=None):
             return response
         except NotFoundException:
             abort(404)
+        except:
+            abort(500)
 
     """
     @TODO:
@@ -246,6 +261,8 @@ def create_app(test_config=None):
         try:
             body = request.get_json()
             quiz_category = body.get('quizCategory', None)
+            if quiz_category is None:
+                raise MissingDataException
             if quiz_category is not None:
                 quiz_category = int(quiz_category)
             if Category.query.get(quiz_category) is None:
@@ -263,8 +280,10 @@ def create_app(test_config=None):
             })
         except NotFoundException:
             abort(404)
+        except MissingDataException:
+            abort(422)
         except:
-            abort(400)
+            abort(500)
 
     """
     @TODO:
